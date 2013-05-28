@@ -35,7 +35,7 @@ module LogStash::EventV1
     @cancelled = false
 
     @data = data
-    @data["@timestamp"] = LogStash::Time.now if !@data.include?("@timestamp")
+    @data["@timestamp"] = ::Time.now if !@data.include?("@timestamp")
     @data["@version"] = "1" if !@data.include?("@version")
   end # def initialize
 
@@ -169,39 +169,24 @@ module LogStash::EventV1
 
       if key == "+%s"
         # Got %{+%s}, support for unix epoch time
-        if RUBY_ENGINE != "jruby"
-          # This is really slow. See LOGSTASH-217
-          Time.parse(self.timestamp).to_i
-        else
-          datetime = @@date_parser.parseDateTime(self.timestamp)
-          (datetime.getMillis / 1000).to_i
-        end
+        next @data["@timestamp"].to_i
       elsif key[0,1] == "+"
-        # We got a %{+TIMEFORMAT} so use joda to format it.
-        if RUBY_ENGINE != "jruby"
-          # This is really slow. See LOGSTASH-217
-          datetime = Date.parse(self.timestamp)
-          format = key[1 .. -1]
-          datetime.strftime(format)
-        else
-          datetime = @@date_parser.parseDateTime(self.timestamp)
-          format = key[1 .. -1]
-          datetime.toString(format) # return requested time format
-        end
+        t = @data["@timestamp"]
+        next org.joda.time.Instant.new(t.tv_sec * 1000 + t.tv_usec / 1000).format(key[1 .. -1])
       else
         value = self[key]
         case value
-        when nil
-          tok # leave the %{foo} if this field does not exist in this event.
-        when Array
-          value.join(",") # Join by ',' if value is an array
-        when Hash
-          value.to_json # Convert hashes to json
-        else
-          value # otherwise return the value
-        end
-      end
-    end
+          when nil
+            tok # leave the %{foo} if this field does not exist in this event.
+          when Array
+            value.join(",") # Join by ',' if value is an array
+          when Hash
+            value.to_json # Convert hashes to json
+          else
+            value # otherwise return the value
+        end # case value
+      end # 'key' checking
+    end # format.gsub...
   end # def sprintf
 
   # Shims to remove after event v1 is the default.
