@@ -30,13 +30,6 @@ require "uri"
 module LogStash::EventV1
   class DeprecatedMethod < StandardError; end
 
-  if defined?(RUBY_ENGINE) && RUBY_ENGINE == "jruby"
-    @@date_parser = Java::org.joda.time.format.ISODateTimeFormat.dateTimeParser.withOffsetParsed
-  else
-    # TODO(sissel): LOGSTASH-217
-    @@date_parser ||= nil
-  end
-
   public
   def initialize(data={})
     @cancelled = false
@@ -211,13 +204,10 @@ module LogStash::EventV1
     end
   end # def sprintf
 
-  #Temporary hack to get around the use of things like event.source or event.tags. 
-  #REMOVE BEFORE 1.2 release
-  def method_missing(method, *args, &block)
-    if method.to_s =~ /(.*)=$/
-      self[method]= args
-    else
-      self[method]
-    end
-  end
+  # Shims to remove after event v1 is the default.
+  def tags=(value); self["tags"] = value; end
+  def message=(value); self["message"] = value; end
+  def source=(value); self["source"] = value; end
+  def type=(value); self["type"] = value; end
+  def type; return self["type"]; end
 end # module LogStash::EventV1
